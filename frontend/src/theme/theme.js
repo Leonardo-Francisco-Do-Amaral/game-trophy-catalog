@@ -1,52 +1,40 @@
 import { createTheme } from '@mui/material/styles';
-import { deepPurple, grey } from '@mui/material/colors'; // Importando grey para o background
+import { deepPurple, grey } from '@mui/material/colors';
 
 const theme = createTheme({
   palette: {
-    mode: 'dark', // Tema escuro
+    mode: 'dark',
     primary: {
-      main: deepPurple[400], // Um roxo um pouco mais claro para a primária
+      main: deepPurple[400],
       light: deepPurple[200],
       dark: deepPurple[700],
       contrastText: '#fff',
     },
     secondary: {
-      main: '#82b1ff', // Um azul claro vibrante (similar ao indigo A200, bom para acentos)
+      main: '#82b1ff',
       light: '#b7e3ff',
       dark: '#4c82cc',
       contrastText: '#000',
     },
     background: {
-      default: grey[900], // Fundo principal da página (quase preto)
-      paper: grey[800],   // Fundo para Cards, Modals, etc. (um cinza escuro)
+      default: grey[900],
+      paper: grey[800],
     },
     text: {
-      primary: '#fff',     // Texto principal branco
-      secondary: grey[400], // Texto secundário em cinza claro
+      primary: '#fff',
+      secondary: grey[400],
     },
-    // Você pode adicionar mais cores aqui, se desejar
-    // error: { main: '#f44336' },
-    // warning: { main: '#ff9800' },
-    // info: { main: '#2196f3' },
-    // success: { main: '#4caf50' },
+    error: {
+      main: '#e53935',
+    },
   },
   typography: {
-    fontFamily: 'Roboto, sans-serif',
-    h4: {
-      fontWeight: 700,
-      marginBottom: '1rem',
-      color: deepPurple[200], // Cor mais clara para o título principal
-    },
-    h5: { // Para os títulos dos jogos nos cards
-      fontWeight: 600,
-      color: deepPurple[100],
-    },
-    body1: {
-      lineHeight: 1.6,
-    },
-    button: {
-      textTransform: 'none', // Remove a capitalização automática dos botões
-    }
+    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    h3: { fontWeight: 700 },
+    h4: { fontWeight: 700, color: deepPurple[200] },
+    h5: { fontWeight: 600, color: deepPurple[100] },
+    h6: { fontWeight: 600 },
+    button: { textTransform: 'none', fontWeight: 600 },
   },
   components: {
     MuiButton: {
@@ -57,35 +45,43 @@ const theme = createTheme({
       },
     },
     MuiAppBar: {
-        styleOverrides: {
-            root: {
-                background: grey[900], // AppBar agora combina com o background padrão
-                boxShadow: '0px 2px 4px -1px rgba(0,0,0,0.2), 0px 4px 5px 0px rgba(0,0,0,0.14), 0px 1px 10px 0px rgba(0,0,0,0.12)', // Sombra para destaque
-            },
+      styleOverrides: {
+        root: {
+          background: grey[900],
+          boxShadow: '0px 2px 4px -1px rgba(0,0,0,0.2), 0px 4px 5px 0px rgba(0,0,0,0.14), 0px 1px 10px 0px rgba(0,0,0,0.12)',
         },
+      },
     },
     MuiCard: {
-        styleOverrides: {
-            root: {
-                borderRadius: 12, // Bordas mais arredondadas para os cartões
-                boxShadow: '0px 6px 15px rgba(0, 0, 0, 0.4)', // Sombra mais proeminente
-                backgroundColor: grey[800], // Usa a cor de background.paper do tema
-                transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out', // Transição suave
-                '&:hover': {
-                    transform: 'translateY(-5px)', // Leve elevação ao passar o mouse
-                    boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.6)', // Sombra maior ao passar o mouse
-                },
-            },
+      styleOverrides: {
+        root: {
+          borderRadius: 12,
+          boxShadow: '0px 6px 15px rgba(0, 0, 0, 0.4)',
+          backgroundColor: grey[800],
+          transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
+          '&:hover': {
+            transform: 'translateY(-5px)',
+            boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.6)',
+          },
         },
+      },
     },
     MuiContainer: {
-        styleOverrides: {
-            root: {
-                paddingTop: '2rem',    // Adiciona padding no topo
-                paddingBottom: '2rem', 
-            },
+      styleOverrides: {
+        root: {
+          paddingTop: '2rem',
+          paddingBottom: '2rem',
         },
+      },
     },
+    MuiChip: {
+      styleOverrides: {
+        root: {
+          borderRadius: 6,
+          fontWeight: 500
+        }
+      }
+    }
   },
 });
 

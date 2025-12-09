@@ -1,85 +1,58 @@
-// src/App.jsx
-
-import React, { useState } from 'react';
+import React from 'react';
 import { AppBar, Toolbar, Typography, Container, Box, CssBaseline, ThemeProvider } from '@mui/material';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { SnackbarProvider } from 'notistack';
 import HomePage from './components/HomePage';
 import ListaJogos from './components/ListaJogos';
 import CadastroJogo from './components/CadastroJogo';
-import { createTheme } from '@mui/material/styles';
+import theme from './theme/theme';
 
-const customTheme = createTheme({
-  palette: {
-    mode: 'dark',
-    primary: {
-      main: '#3f51b5',
-    },
-    secondary: {
-      main: '#f50057',
-    },
-    background: {
-      default: '#121212',
-      paper: '#1e1e1e',
-    },
-  },
-  typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-    h3: { fontWeight: 700 },
-    h4: { fontWeight: 700 },
-    h6: { fontWeight: 600 },
-  },
-  components: {
-    MuiButton: { styleOverrides: { root: { borderRadius: 8, textTransform: 'none', fontWeight: 600 } } },
-  },
-});
-
-function App() {
-  const [currentPage, setCurrentPage] = useState('home');
-  const [gameIdToEdit, setGameIdToEdit] = useState(null);
-
-  const navigateTo = (page, payload = null) => {
-    if (page === 'editarJogo') {
-      setGameIdToEdit(payload); // Armazena o ID
-      setCurrentPage('cadastroJogo'); // Navega para a página de cadastro/edição
-    } else {
-      setGameIdToEdit(null); // Limpa o ID ao navegar para outras páginas
-      setCurrentPage(page);
-    }
-  }
-
-   const renderPage = () => {
-    switch (currentPage) {
-      case 'listaJogos':
-        return <ListaJogos onNavigate={navigateTo} />;
-      case 'cadastroJogo':
-        // MUDANÇA: Passamos o ID do jogo a ser editado como uma prop
-        return <CadastroJogo onNavigate={navigateTo} gameIdToEdit={gameIdToEdit} />;
-      case 'home':
-      default:
-        return <HomePage onNavigate={navigateTo} />;
-    }
-  };
+function AppContent() {
+  const navigate = useNavigate();
 
   return (
-    <ThemeProvider theme={customTheme}>
-      <Box sx={{ flexGrow: 1, minHeight: '100vh' }}>
-        <CssBaseline />
-        <AppBar position="static" elevation={1} color="default" sx={{ backgroundColor: 'background.paper' }}>
-          <Toolbar>
-            <Typography 
-              variant="h6" 
-              component="div" 
-              sx={{ flexGrow: 1, cursor: 'pointer' }}
-              onClick={() => navigateTo('home')}
-            >
-              Meu Catálogo de Jogos
-            </Typography>
-          </Toolbar>
-        </AppBar>
-        {/* MUDANÇA AQUI: de 'lg' para 'xl' para acomodar a lista de jogos */}
-        <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-          {renderPage()}
-        </Container>
-      </Box>
+    <Box sx={{ flexGrow: 1, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <CssBaseline />
+      <AppBar position="static" elevation={1} color="default" sx={{ backgroundColor: 'background.paper' }}>
+        <Toolbar>
+          <Typography
+            variant="h6"
+            component="div"
+            sx={{ flexGrow: 1, cursor: 'pointer', fontWeight: 'bold', letterSpacing: 0.5 }}
+            onClick={() => navigate('/')}
+          >
+            Meu Catálogo de Jogos
+          </Typography>
+        </Toolbar>
+      </AppBar>
+      <Container maxWidth="xl" sx={{ mt: 4, mb: 4, flexGrow: 1 }}>
+        <Routes>
+          <Route path="/" element={<HomePage onNavigate={(page) => navigate(page === 'listaJogos' ? '/jogos' : '/cadastro')} />} />
+          <Route path="/jogos" element={<ListaJogos onNavigate={(page, id) => navigate(page === 'editarJogo' ? `/editar/${id}` : '/')} />} />
+          <Route path="/cadastro" element={<CadastroJogo onNavigate={(page) => navigate(page === 'listaJogos' ? '/jogos' : '/')} />} />
+          <Route path="/editar/:id" element={<CadastroJogoWrapper />} />
+        </Routes>
+      </Container>
+    </Box>
+  );
+}
+
+// Wrapper to handle params for edit mode
+import { useParams } from 'react-router-dom';
+function CadastroJogoWrapper() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  return <CadastroJogo onNavigate={(page) => navigate(page === 'listaJogos' ? '/jogos' : '/')} gameIdToEdit={id} />;
+}
+
+function App() {
+  return (
+    <ThemeProvider theme={theme}>
+      <SnackbarProvider maxSnack={3} anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
+        <Router>
+          <AppContent />
+        </Router>
+      </SnackbarProvider>
     </ThemeProvider>
   );
 }
