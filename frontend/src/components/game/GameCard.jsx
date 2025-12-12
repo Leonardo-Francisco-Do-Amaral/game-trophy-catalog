@@ -11,6 +11,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { motion, useMotionValue, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 import theme from '../../theme/theme';
 import { formatTotalTime, normPlatform } from '../../utils/formatters';
+import { BADGE_CATEGORIES, LEGACY_BADGE_MAP } from '../../utils/badges';
 
 
 const GameCard = ({ game, onClick }) => {
@@ -121,38 +122,7 @@ const GameCard = ({ game, onClick }) => {
         tags = [];
     }
 
-    // Anime Style Logic
-    const isAnime = tags.includes('Estilo Anime');
 
-    // Tag Visual Configurations - Badges Only
-    const getTagStyle = (tag) => {
-        // Default style for any tag
-        const defaultStyle = {
-            bg: 'rgba(255, 255, 255, 0.1)',
-            color: '#fff',
-            border: 'rgba(255, 255, 255, 0.3)',
-            shadow: 'rgba(0, 0, 0, 0.3)'
-        };
-
-        switch (tag) {
-            case 'Estilo Anime':
-                return { bg: '#ff0055', color: '#fff', border: '#ff0055', shadow: 'rgba(255, 0, 85, 0.5)' };
-            case 'Retro':
-                return { bg: '#4caf50', color: '#000', border: '#2e7d32', shadow: 'rgba(76, 175, 80, 0.5)' };
-            case 'Brasileiro':
-                return { bg: '#ffeb3b', color: '#009c3b', border: '#009c3b', shadow: 'rgba(0, 156, 59, 0.5)' };
-            case 'Vencedor do GOTY':
-                return { bg: '#ffd700', color: '#000', border: '#b8860b', shadow: 'rgba(255, 215, 0, 0.5)' };
-            case 'Opção de Romance':
-                return { bg: '#e91e63', color: '#fff', border: '#c2185b', shadow: 'rgba(233, 30, 99, 0.5)' };
-            case 'Multiplos Finais':
-                return { bg: '#9c27b0', color: '#fff', border: '#7b1fa2', shadow: 'rgba(156, 39, 176, 0.5)' };
-            case 'Remaster/Remake':
-                return { bg: '#00bcd4', color: '#000', border: '#0097a7', shadow: 'rgba(0, 188, 212, 0.5)' };
-            default:
-                return defaultStyle;
-        }
-    };
 
     const magmaNeonStyle = isExtremelyHard ? {
         border: '2px solid #ff3d00',
@@ -944,14 +914,15 @@ const GameCard = ({ game, onClick }) => {
                                 left: 0,
                                 width: '100%',
                                 height: '100%',
-                                background: 'rgba(0, 0, 0, 0.85)',
+                                background: 'rgba(0, 0, 0, 0.90)', // Darker background for contrast
                                 zIndex: 50,
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
-                                justifyContent: 'center',
+                                justifyContent: 'flex-start', // Start from top
                                 padding: '20px',
-                                boxSizing: 'border-box'
+                                boxSizing: 'border-box',
+                                overflowY: 'auto' // Allow scrolling if many badges
                             }}
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -978,79 +949,95 @@ const GameCard = ({ game, onClick }) => {
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     cursor: 'pointer',
-                                    color: '#fff'
+                                    color: '#fff',
+                                    zIndex: 60
                                 }}
                             >
                                 <CloseIcon fontSize="small" />
                             </motion.button>
 
-                            <Typography variant="h6" sx={{ color: '#FFD700', mb: 3, fontWeight: 'bold', textShadow: '0 0 10px rgba(255, 215, 0, 0.5)' }}>
+                            <Typography variant="h6" sx={{ color: '#FFD700', mb: 2, mt: 1, fontWeight: 'bold', textShadow: '0 0 10px rgba(255, 215, 0, 0.5)', flexShrink: 0 }}>
                                 Badges & Conquistas
                             </Typography>
 
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center' }}>
-                                {tags.length > 0 ? tags.map((tag, index) => {
-                                    const cleanTag = tag.replace(/['"{}\\]/g, '').trim();
-                                    const style = getTagStyle(cleanTag);
+                            <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                {(() => {
+                                    const categoriesToRender = Object.entries(BADGE_CATEGORIES).map(([categoryName, categoryData]) => {
+                                        const gameBadges = categoryData.badges.filter(badge => {
+                                            return tags.some(t => {
+                                                const cleanTag = t.replace(/['"{}\\]/g, '').trim();
+                                                return cleanTag === badge.id || LEGACY_BADGE_MAP[cleanTag] === badge.id;
+                                            });
+                                        });
+                                        return { name: categoryName, badges: gameBadges };
+                                    }).filter(cat => cat.badges.length > 0);
 
-                                    // Map tags to their specific badge images
-                                    const badgeImages = {
-                                        'Estilo Anime': '/badge/Anime.png',
-                                        'Brasileiro': '/badge/Brasileiro.png',
-                                        'Vencedor do GOTY': '/badge/GOTY.png',
-                                        'Multiplos Finais': '/badge/Finais.png',
-                                        'Remaster/Remake': '/badge/Remaster.png',
-                                        'Opção de Romance': '/badge/Romance.png',
-                                        'Vampiro': '/badge/Vampiro.png',
-                                        'Retro': '/badge/Retro.png'
-                                    };
+                                    if (categoriesToRender.length === 0) {
+                                        return (
+                                            <Typography variant="body2" sx={{ color: '#aaa', textAlign: 'center', mt: 4 }}>
+                                                Nenhuma badge especial.
+                                            </Typography>
+                                        );
+                                    }
 
-                                    const badgeImage = badgeImages[cleanTag];
-
-                                    return (
-                                        <motion.div
-                                            key={`overlay-tag-${index}`}
-                                            initial={{ scale: 0, y: 20 }}
-                                            animate={{ scale: 1, y: 0 }}
-                                            transition={{ delay: index * 0.1, type: 'spring', stiffness: 200 }}
-                                        >
-                                            {badgeImage ? (
-                                                <Tooltip title={cleanTag}>
-                                                    <Box
-                                                        component="img"
-                                                        src={badgeImage}
-                                                        alt={cleanTag}
-                                                        sx={{
-                                                            height: 70, // Slightly larger for better visibility
-                                                            width: 'auto',
-                                                            objectFit: 'contain',
-                                                            filter: 'drop-shadow(0 0 8px rgba(255, 255, 255, 0.2))',
-                                                            transition: 'transform 0.2s',
-                                                            '&:hover': { transform: 'scale(1.1) rotate(5deg)' }
+                                    return categoriesToRender.map((cat, catIndex) => (
+                                        <Box key={cat.name} sx={{ width: '100%' }}>
+                                            <Typography variant="caption" sx={{
+                                                color: '#00fff2',
+                                                fontWeight: 'bold',
+                                                borderBottom: '1px solid rgba(0, 255, 242, 0.3)',
+                                                pb: 0.5,
+                                                mb: 1.5,
+                                                display: 'block',
+                                                textTransform: 'uppercase',
+                                                fontSize: '0.75rem'
+                                            }}>
+                                                {cat.name}
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center' }}>
+                                                {cat.badges.map((badge, badgeIndex) => (
+                                                    <motion.div
+                                                        key={`${badge.id}-${badgeIndex}`}
+                                                        initial={{ scale: 0, y: 10 }}
+                                                        animate={{ scale: 1, y: 0 }}
+                                                        transition={{ delay: badgeIndex * 0.05 + catIndex * 0.1, type: 'spring', stiffness: 200 }}
+                                                        style={{
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            alignItems: 'center',
+                                                            width: 80 // Fixed width for alignment
                                                         }}
-                                                    />
-                                                </Tooltip>
-                                            ) : (
-                                                <Chip
-                                                    label={cleanTag}
-                                                    sx={{
-                                                        background: style.bg,
-                                                        color: style.color,
-                                                        border: `1px solid ${style.border}`,
-                                                        fontWeight: 'bold',
-                                                        boxShadow: `0 0 15px ${style.shadow}`,
-                                                        fontSize: '0.9rem',
-                                                        height: 32
-                                                    }}
-                                                />
-                                            )}
-                                        </motion.div>
-                                    );
-                                }) : (
-                                    <Typography variant="body2" sx={{ color: '#aaa' }}>
-                                        Nenhuma badge especial.
-                                    </Typography>
-                                )}
+                                                    >
+                                                        <Box
+                                                            component="img"
+                                                            src={badge.img}
+                                                            alt={badge.label}
+                                                            sx={{
+                                                                height: 40, // Smaller image as requested
+                                                                width: 'auto',
+                                                                objectFit: 'contain',
+                                                                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))',
+                                                                mb: 0.5,
+                                                                transition: 'transform 0.2s',
+                                                                '&:hover': { transform: 'scale(1.1)' }
+                                                            }}
+                                                        />
+                                                        <Typography variant="caption" sx={{
+                                                            color: '#fff',
+                                                            fontWeight: '600',
+                                                            textAlign: 'center',
+                                                            fontSize: '0.65rem',
+                                                            lineHeight: 1.1,
+                                                            textShadow: '0 1px 2px rgba(0,0,0,0.8)'
+                                                        }}>
+                                                            {badge.label}
+                                                        </Typography>
+                                                    </motion.div>
+                                                ))}
+                                            </Box>
+                                        </Box>
+                                    ));
+                                })()}
                             </Box>
                         </motion.div>
                     )}

@@ -48,18 +48,19 @@ import {
   Schedule as ScheduleIcon,
   SportsEsports as PlatformIcon,
   Clear as ClearIcon,
+  Warning as WarningIcon,
   AutoAwesome as AutoAwesomeIcon,
   Edit as EditIcon,
   Add as AddIcon,
-  PhotoCamera as PhotoIcon,
-  Info as InfoIcon,
-  Refresh as RefreshIcon,
-  Collections as CollectionsIcon,
+  Delete as DeleteIcon,
   CloudUpload as CloudUploadIcon,
+  Collections as CollectionsIcon,
+  PhotoCamera as PhotoIcon,
   Close as CloseIcon
 } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import { api } from '../services/api';
+import { BADGE_CATEGORIES, LEGACY_BADGE_MAP } from '../utils/badges';
 
 const RAWG_API_KEY = '656d689bf531403b95aa1d95d29de23e';
 
@@ -104,18 +105,10 @@ const initialFormData = {
   tags: [], // Initialize as empty array
 };
 
-const tagOptions = [
-  'Estilo Anime',
-  'Retro',
-  'Brasileiro',
-  'Vencedor do GOTY',
-  'Opção de Romance',
-  'Multiplos Finais',
-  'Remaster/Remake'
-];
+// BADGE_CATEGORIES removed - imported from utils/badges
 
 const platformOptions = [
-  'PlayStation 5', 'PlayStation 4', 'PlayStation 3', 'PlayStation 2', 'PlayStation',
+  'PS5', 'PS4', 'PlayStation 3', 'PlayStation 2', 'PlayStation',
   'PlayStation Portable', 'PlayStation Vita', 'Xbox Series X/S', 'Xbox One', 'Xbox 360',
   'Xbox', 'Nintendo Switch', 'Nintendo 3DS', 'Nintendo DS', 'Wii U', 'Wii', 'GameCube',
   'Nintendo 64', 'Super Nintendo', 'Nintendo Entertainment System', 'PC', 'Steam Deck',
@@ -193,8 +186,41 @@ function CadastroJogo({ onNavigate, gameIdToEdit }) {
         setLoadingDetails(true);
         try {
           const data = await api.getGameById(gameIdToEdit);
+
+          // Normaliza as tags para garantir que Labels antigos sejam convertidos para IDs atuais
+          let loadedTags = [];
+          try {
+            if (Array.isArray(data.tags)) loadedTags = data.tags;
+            else if (typeof data.tags === 'string') {
+              if (data.tags.startsWith('[')) loadedTags = JSON.parse(data.tags);
+              else if (data.tags.includes(',')) loadedTags = data.tags.split(',').map(t => t.trim());
+              else if (data.tags) loadedTags = [data.tags];
+            }
+          } catch (e) {
+            console.error('Erro ao processar tags:', e);
+            loadedTags = [];
+          }
+
+          const allBadgesFlat = Object.values(BADGE_CATEGORIES).flatMap(c => c.badges);
+          const normalizedTags = loadedTags.map(tag => {
+            const cleanTag = tag.replace(/['"{}\\]/g, '').trim();
+            // 1. First check if it is already a known NEW ID
+            if (allBadgesFlat.some(b => b.id === cleanTag)) return cleanTag;
+
+            // 2. Check if it is a LEGACY tag that can be mapped
+            if (LEGACY_BADGE_MAP[cleanTag]) return LEGACY_BADGE_MAP[cleanTag];
+
+            // 3. Fallback: try finding by label (less reliable but good backup)
+            const match = allBadgesFlat.find(b => b.label === cleanTag);
+            return match ? match.id : cleanTag;
+          });
+
+          // Remove duplicatas
+          const uniqueTags = [...new Set(normalizedTags)];
+
           const formattedData = {
             ...data,
+            tags: uniqueTags,
             platinado: data.platinado ? 'sim' : 'nao',
             status_online: data.status_online ? data.status_online.replace(/ /g, '_') : 'exclusivamente_offline',
             completude_jogo: data.completude_jogo ? data.completude_jogo.replace(/ /g, '_') : 'nao_platinado',
@@ -373,6 +399,10 @@ function CadastroJogo({ onNavigate, gameIdToEdit }) {
       completude_jogo: formData.completude_jogo.replace(/_/g, ' '),
       dificuldade_platina: formData.dificuldade_platina.replace(/_/g, ' '),
       plataforma: formData.plataforma === 'Outra' ? customPlatform : formData.plataforma,
+      // Ensure tags are stored as a JSON string and remove duplicates
+      tags: Array.isArray(formData.tags)
+        ? JSON.stringify([...new Set(formData.tags)])
+        : formData.tags
     };
 
     try {
@@ -441,6 +471,33 @@ function CadastroJogo({ onNavigate, gameIdToEdit }) {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleToggleTag = (tagId) => {
+    setFormData(prev => {
+      let currentTags = [];
+      if (Array.isArray(prev.tags)) {
+        currentTags = [...prev.tags];
+      } else if (typeof prev.tags === 'string' && prev.tags) {
+        if (prev.tags.startsWith('[')) {
+          try {
+            currentTags = JSON.parse(prev.tags);
+          } catch (e) {
+            currentTags = [prev.tags];
+          }
+        } else if (prev.tags.includes(',')) {
+          currentTags = prev.tags.split(',').map(t => t.trim());
+        } else {
+          currentTags = [prev.tags];
+        }
+      }
+
+      if (currentTags.includes(tagId)) {
+        return { ...prev, tags: currentTags.filter(t => t !== tagId) };
+      } else {
+        return { ...prev, tags: [...currentTags, tagId] };
+      }
+    });
   };
 
   const getProgressPercentage = () => {
@@ -738,43 +795,15 @@ function CadastroJogo({ onNavigate, gameIdToEdit }) {
                     <Grid item xs={12} sm={4}>
                       <TextField fullWidth label="Metacritic" name="metacritic" type="number" value={formData.metacritic} onChange={handleChange} InputProps={{ startAdornment: <InputAdornment position="start">Ⓜ️</InputAdornment> }} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, backgroundColor: alpha(theme.palette.info.light, 0.1) } }} />
                     </Grid>
-                    <Grid item xs={12} sm={4}>
-                      <Autocomplete
-                        multiple
-                        id="tags-outlined"
-                        options={tagOptions}
-                        getOptionLabel={(option) => option}
-                        value={(() => {
-                          if (Array.isArray(formData.tags)) return formData.tags;
-                          if (typeof formData.tags === 'string') {
-                            try {
-                              return formData.tags.startsWith('[') ? JSON.parse(formData.tags) : (formData.tags ? [formData.tags] : []);
-                            } catch (e) {
-                              return formData.tags ? [formData.tags] : [];
-                            }
-                          }
-                          return [];
-                        })()}
-                        onChange={(event, newValue) => {
-                          setFormData({ ...formData, tags: newValue });
-                        }}
-                        filterSelectedOptions
-                        renderInput={(params) => (
-                          <TextField
-                            {...params}
-                            label="Tags Especiais"
-                            placeholder="Selecione tags"
-                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, backgroundColor: alpha(theme.palette.secondary.light, 0.1) } }}
-                          />
-                        )}
-                      />
-                    </Grid>
+
                     <Grid item xs={12}>
                       <TextField fullWidth label="Nota Total (Média Automática)" name="nota_total" value={formData.nota_total} InputProps={{ readOnly: true, startAdornment: <InputAdornment position="start">⭐</InputAdornment> }} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, backgroundColor: alpha(theme.palette.success.light, 0.1) } }} />
                     </Grid>
                   </Grid>
                 </CardContent>
               </Paper>
+
+
 
               <Paper elevation={6} sx={{ mb: 4, borderRadius: 3, overflow: 'hidden' }}>
                 <Box sx={{ background: GRADIENTS.secondary, color: 'white', p: 3, display: 'flex', alignItems: 'center' }}>
@@ -886,6 +915,144 @@ function CadastroJogo({ onNavigate, gameIdToEdit }) {
                       <TextField fullWidth label="Troféu Mais Difícil (%)" name="trofeu_mais_dificil_percentual" type="number" value={formData.trofeu_mais_dificil_percentual} onChange={handleChange} InputProps={{ inputProps: { min: 0, max: 100, step: 0.01 }, startAdornment: <InputAdornment position="start">💎</InputAdornment>, endAdornment: <InputAdornment position="end">%</InputAdornment> }} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, backgroundColor: alpha(theme.palette.background.paper, 0.5) } }} />
                     </Grid>
                   </Grid>
+                </CardContent>
+              </Paper>
+
+              <Paper elevation={6} sx={{ mb: 4, borderRadius: 3, overflow: 'hidden' }}>
+                <Box sx={{ background: 'linear-gradient(135deg, #FFD700 0%, #FF8C00 100%)', color: 'white', p: 3, display: 'flex', alignItems: 'center' }}>
+                  <EmojiEventsIcon sx={{ mr: 2, fontSize: 28 }} />
+                  <Typography variant="h5" sx={{ fontWeight: 600, textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>Badges & Conquistas Especiais</Typography>
+                </Box>
+                <CardContent sx={{ p: 4, background: alpha(theme.palette.background.paper, 0.4) }}>
+                  <Grid container spacing={3}>
+                    {Object.entries(BADGE_CATEGORIES).map(([categoryName, categoryData]) => (
+                      <Grid item xs={12} key={categoryName}>
+                        <Paper elevation={0} sx={{ p: 2, background: 'rgba(0,0,0,0.2)', borderRadius: 2, height: '100%' }}>
+                          <Box sx={{ mb: 2, borderBottom: '1px solid rgba(255,255,255,0.1)', pb: 1 }}>
+                            <Typography variant="h6" sx={{ color: '#FFD700', fontWeight: 'bold' }}>
+                              {categoryName}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#aaa', fontStyle: 'italic' }}>
+                              {categoryData.description}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                            {categoryData.badges.map((badge) => {
+                              let isSelected = false;
+                              if (Array.isArray(formData.tags)) {
+                                isSelected = formData.tags.includes(badge.id);
+                              } else if (typeof formData.tags === 'string') {
+                                isSelected = formData.tags.includes(badge.id);
+                              }
+
+                              return (
+                                <Tooltip
+                                  key={badge.id}
+                                  title={
+                                    <Box sx={{ textAlign: 'center' }}>
+                                      <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#FFD700' }}>{badge.label}</Typography>
+                                      <Typography variant="body2">{badge.desc}</Typography>
+                                    </Box>
+                                  }
+                                  arrow
+                                  placement="top"
+                                >
+                                  <Box
+                                    onClick={() => handleToggleTag(badge.id)}
+                                    sx={{
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      alignItems: 'center',
+                                      p: 2,
+                                      borderRadius: 2,
+                                      cursor: 'pointer',
+                                      background: isSelected ? 'rgba(0, 255, 242, 0.15)' : 'rgba(255,255,255,0.03)',
+                                      border: isSelected ? '1px solid #00fff2' : '1px solid transparent',
+                                      transition: 'all 0.2s',
+                                      minWidth: 100,
+                                      '&:hover': { background: 'rgba(255,255,255,0.08)', transform: 'translateY(-2px)' }
+                                    }}
+                                  >
+                                    <Box
+                                      component="img"
+                                      src={badge.img}
+                                      alt={badge.label}
+                                      sx={{ width: 64, height: 64, objectFit: 'contain', mb: 1, filter: isSelected ? 'drop-shadow(0 0 8px rgba(0, 255, 242, 0.5))' : 'grayscale(0.5)' }}
+                                    />
+                                    <Typography variant="body2" sx={{ color: isSelected ? '#00fff2' : '#e0e0e0', fontWeight: isSelected ? 'bold' : 'medium', textAlign: 'center' }}>
+                                      {badge.label}
+                                    </Typography>
+                                  </Box>
+                                </Tooltip>
+                              );
+                            })}
+                          </Box>
+                        </Paper>
+                      </Grid>
+                    ))}
+                  </Grid>
+
+                  {/* Legacy/Extra Tags Section */}
+                  {(() => {
+                    const allBadgeIds = new Set();
+                    Object.values(BADGE_CATEGORIES).forEach(cat => {
+                      cat.badges.forEach(b => allBadgeIds.add(b.id));
+                    });
+
+                    let currentTags = [];
+                    try {
+                      if (Array.isArray(formData.tags)) {
+                        currentTags = formData.tags;
+                      } else if (typeof formData.tags === 'string' && formData.tags) {
+                        if (formData.tags.startsWith('[')) {
+                          currentTags = JSON.parse(formData.tags);
+                        } else if (formData.tags.includes(',')) {
+                          currentTags = formData.tags.split(',').map(t => t.trim());
+                        } else {
+                          currentTags = [formData.tags];
+                        }
+                      }
+                    } catch (e) {
+                      currentTags = [];
+                    }
+
+                    const extraTags = currentTags.filter(tag => {
+                      const cleanTag = tag.replace(/['"{}\\]/g, '').trim();
+                      return !allBadgeIds.has(cleanTag) && cleanTag !== ''; // Show if NOT in known categories
+                    });
+
+                    if (extraTags.length > 0) {
+                      return (
+                        <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                          <Typography variant="subtitle1" sx={{ color: '#ff9800', fontWeight: 'bold', mb: 1, display: 'flex', alignItems: 'center' }}>
+                            <WarningIcon sx={{ mr: 1, fontSize: 20 }} />
+                            Tags Extras / Antigas Detectadas
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: '#aaa', mb: 2 }}>
+                            Estas tags não fazem parte das novas categorias. Você pode removê-las clicando no "X".
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                            {extraTags.map((tag, index) => (
+                              <Chip
+                                key={`extra-${index}`}
+                                label={tag.replace(/['"{}\\]/g, '')}
+                                onDelete={() => handleToggleTag(tag)}
+                                sx={{
+                                  background: 'rgba(255, 152, 0, 0.15)',
+                                  color: '#ff9800',
+                                  border: '1px solid rgba(255, 152, 0, 0.3)',
+                                  fontWeight: 'bold',
+                                  '& .MuiChip-deleteIcon': { color: '#ff9800', '&:hover': { color: '#ffb74d' } }
+                                }}
+                              />
+                            ))}
+                          </Box>
+                        </Box>
+                      );
+                    }
+                    return null;
+                  })()}
+
                 </CardContent>
               </Paper>
 

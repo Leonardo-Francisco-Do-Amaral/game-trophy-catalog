@@ -5,6 +5,7 @@ import { SnackbarProvider } from 'notistack';
 import HomePage from './components/HomePage';
 import ListaJogos from './components/ListaJogos';
 import CadastroJogo from './components/CadastroJogo';
+import RankingPage from './pages/RankingPage';
 import theme from './theme/theme';
 
 function AppContent() {
@@ -23,12 +24,21 @@ function AppContent() {
           >
             Meu Catálogo de Jogos
           </Typography>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Typography variant="button" sx={{ cursor: 'pointer', '&:hover': { color: 'primary.main' } }} onClick={() => navigate('/jogos')}>
+              Jogos
+            </Typography>
+            <Typography variant="button" sx={{ cursor: 'pointer', '&:hover': { color: 'primary.main' } }} onClick={() => navigate('/ranking')}>
+              Ranking GOTY
+            </Typography>
+          </Box>
         </Toolbar>
       </AppBar>
       <Container maxWidth="xl" sx={{ mt: 4, mb: 4, flexGrow: 1 }}>
         <Routes>
-          <Route path="/" element={<HomePage onNavigate={(page) => navigate(page === 'listaJogos' ? '/jogos' : '/cadastro')} />} />
+          <Route path="/" element={<HomePage onNavigate={(page) => navigate(page === 'listaJogos' ? '/jogos' : page === 'ranking' ? '/ranking' : '/cadastro')} />} />
           <Route path="/jogos" element={<ListaJogos onNavigate={(page, id) => navigate(page === 'editarJogo' ? `/editar/${id}` : '/')} />} />
+          <Route path="/ranking" element={<RankingPage />} />
           <Route path="/cadastro" element={<CadastroJogo onNavigate={(page) => navigate(page === 'listaJogos' ? '/jogos' : '/')} />} />
           <Route path="/editar/:id" element={<CadastroJogoWrapper />} />
         </Routes>

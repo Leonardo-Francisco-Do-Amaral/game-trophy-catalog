@@ -4,6 +4,7 @@ import React from 'react';
 import { Box, Button, Typography, Stack } from '@mui/material';
 import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import { motion } from 'framer-motion';
 
 function HomePage({ onNavigate }) {
@@ -71,6 +72,22 @@ function HomePage({ onNavigate }) {
           sx={{ padding: '15px 30px', fontSize: '1.1rem' }}
         >
           Cadastrar Novo Jogo
+        </Button>
+        <Button
+          variant="contained"
+          size="large"
+          color="warning"
+          startIcon={<EmojiEventsIcon />}
+          onClick={() => onNavigate('ranking')}
+          sx={{
+            padding: '15px 30px',
+            fontSize: '1.1rem',
+            bgcolor: 'gold',
+            color: 'black',
+            '&:hover': { bgcolor: '#FFC107' }
+          }}
+        >
+          Ranking GOTY
         </Button>
       </Stack>
     </Box>

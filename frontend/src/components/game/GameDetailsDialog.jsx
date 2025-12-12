@@ -16,6 +16,8 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import theme from '../../theme/theme';
 import { formatDate, formatTotalTime } from '../../utils/formatters';
 
+import { BADGE_CATEGORIES, LEGACY_BADGE_MAP } from '../../utils/badges';
+
 const GameDetailsDialog = ({ game, open, onClose, onNavigate }) => {
     if (!game) return null;
     const totalPlayTime = formatTotalTime(game.tempo_jogado_horas, game.tempo_jogado_minutos);
@@ -103,82 +105,7 @@ const GameDetailsDialog = ({ game, open, onClose, onNavigate }) => {
                             </Stack>
                         </Box>
 
-                        {/* Badges Section */}
-                        <Box sx={{ width: '100%', mt: 1 }}>
-                            <Typography variant="caption" sx={{ color: '#a0a0a0', fontWeight: 'bold', display: 'block', textAlign: 'center', mb: 1, textTransform: 'uppercase' }}>Badges</Typography>
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center' }}>
-                                {(() => {
-                                    let tags = [];
-                                    try {
-                                        if (Array.isArray(game.tags)) {
-                                            tags = game.tags;
-                                        } else if (typeof game.tags === 'string') {
-                                            if (game.tags.startsWith('[')) {
-                                                tags = JSON.parse(game.tags);
-                                            } else if (game.tags.includes(',')) {
-                                                tags = game.tags.split(',').map(t => t.trim());
-                                            } else if (game.tags) {
-                                                tags = [game.tags];
-                                            }
-                                        }
-                                    } catch (e) {
-                                        tags = [];
-                                    }
 
-                                    if (tags.length === 0) return <Typography variant="caption" sx={{ color: '#666' }}>-</Typography>;
-
-                                    return tags.map((tag, index) => {
-                                        const cleanTag = tag.replace(/['"{}\\]/g, '').trim();
-
-                                        const badgeImages = {
-                                            'Estilo Anime': '/badge/Anime.png',
-                                            'Brasileiro': '/badge/Brasileiro.png',
-                                            'Vencedor do GOTY': '/badge/GOTY.png',
-                                            'Multiplos Finais': '/badge/Finais.png',
-                                            'Remaster/Remake': '/badge/Remaster.png',
-                                            'Opção de Romance': '/badge/Romance.png',
-                                            'Vampiro': '/badge/Vampiro.png',
-                                            'Retro': '/badge/Retro.png'
-                                        };
-
-                                        const badgeImage = badgeImages[cleanTag];
-
-                                        if (badgeImage) {
-                                            return (
-                                                <Tooltip key={`detail-tag-${index}`} title={cleanTag}>
-                                                    <Box
-                                                        component="img"
-                                                        src={badgeImage}
-                                                        alt={cleanTag}
-                                                        sx={{
-                                                            height: 32,
-                                                            width: 'auto',
-                                                            objectFit: 'contain',
-                                                            filter: 'drop-shadow(0 0 2px rgba(255, 255, 255, 0.2))',
-                                                        }}
-                                                    />
-                                                </Tooltip>
-                                            );
-                                        }
-
-                                        return (
-                                            <Chip
-                                                key={`detail-tag-${index}`}
-                                                label={cleanTag}
-                                                size="small"
-                                                sx={{
-                                                    height: 20,
-                                                    fontSize: '0.65rem',
-                                                    background: 'rgba(255, 255, 255, 0.1)',
-                                                    color: '#fff',
-                                                    border: '1px solid rgba(255, 255, 255, 0.2)'
-                                                }}
-                                            />
-                                        );
-                                    });
-                                })()}
-                            </Box>
-                        </Box>
                     </Box>
                     {/* Dados Principais e Secundários */}
                     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -206,6 +133,83 @@ const GameDetailsDialog = ({ game, open, onClose, onNavigate }) => {
                                 <Typography variant="body2" sx={{ color: '#e0e0e0' }}><b>Dias para Platina:</b> {game.dias_para_platina ? `${game.dias_para_platina} dias` : '-'}</Typography>
                             </Stack>
                         </Box>
+                    </Box>
+                </Box>
+
+                {/* Full Width Badges Section - Moved to Bottom */}
+                <Box sx={{ p: 3, pt: 0 }}>
+                    <Divider sx={{ mb: 2, borderColor: 'rgba(255, 255, 255, 0.1)' }} />
+                    <Typography variant="subtitle2" sx={{ color: '#a0a0a0', fontWeight: 'bold', display: 'block', mb: 2, textTransform: 'uppercase', letterSpacing: 1 }}>
+                        Badges & Conquistas
+                    </Typography>
+
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {(() => {
+                            let tags = [];
+                            try {
+                                if (Array.isArray(game.tags)) {
+                                    tags = game.tags;
+                                } else if (typeof game.tags === 'string') {
+                                    if (game.tags.startsWith('[')) {
+                                        tags = JSON.parse(game.tags);
+                                    } else if (game.tags.includes(',')) {
+                                        tags = game.tags.split(',').map(t => t.trim());
+                                    } else if (game.tags) {
+                                        tags = [game.tags];
+                                    }
+                                }
+                            } catch (e) {
+                                tags = [];
+                            }
+
+                            const categoriesToRender = Object.entries(BADGE_CATEGORIES).map(([categoryName, categoryData]) => {
+                                const gameBadges = categoryData.badges.filter(badge => {
+                                    return tags.some(t => {
+                                        const cleanTag = t.replace(/['"{}\\]/g, '').trim();
+                                        return cleanTag === badge.id || LEGACY_BADGE_MAP[cleanTag] === badge.id;
+                                    });
+                                });
+                                return { name: categoryName, badges: gameBadges };
+                            }).filter(cat => cat.badges.length > 0);
+
+                            if (categoriesToRender.length === 0) return <Typography variant="caption" sx={{ color: '#666', fontStyle: 'italic' }}>Nenhuma badge especial conquistada.</Typography>;
+
+                            return (
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                                    {categoriesToRender.map((cat, catIndex) => (
+                                        <Box key={cat.name} sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 150, flex: '1 1 auto' }}>
+                                            <Typography variant="caption" sx={{ color: '#00fff2', fontWeight: 'bold', borderBottom: '1px solid rgba(0, 255, 242, 0.3)', pb: 0.5, mb: 0.5 }}>
+                                                {cat.name}
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+                                                {cat.badges.map((badge, badgeIndex) => (
+                                                    <Tooltip key={`${badge.id}-${badgeIndex}`} title={
+                                                        <Box sx={{ textAlign: 'center', p: 0.5 }}>
+                                                            <Typography variant="subtitle2" sx={{ color: '#FFD700', fontWeight: 'bold' }}>{badge.label}</Typography>
+                                                            <Typography variant="caption">{badge.desc}</Typography>
+                                                        </Box>
+                                                    } arrow>
+                                                        <Box
+                                                            component="img"
+                                                            src={badge.img}
+                                                            alt={badge.label}
+                                                            sx={{
+                                                                height: 48,
+                                                                width: 'auto',
+                                                                objectFit: 'contain',
+                                                                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+                                                                transition: 'transform 0.2s',
+                                                                '&:hover': { transform: 'scale(1.1)' }
+                                                            }}
+                                                        />
+                                                    </Tooltip>
+                                                ))}
+                                            </Box>
+                                        </Box>
+                                    ))}
+                                </Box>
+                            );
+                        })()}
                     </Box>
                 </Box>
             </DialogContent>
