@@ -18,7 +18,9 @@ const pool = new Pool({
 
 // Middlewares
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use('/uploads', express.static('uploads'));
 
 // Configuração da API RAWG
 const RAWG_API_KEY = '656d689bf531403b95aa1d95d29de23e';
@@ -31,14 +33,14 @@ const http = require('http');
 function makeRequest(url) {
     return new Promise((resolve, reject) => {
         const protocol = url.startsWith('https:') ? https : http;
-        
+
         const req = protocol.get(url, (res) => {
             let data = '';
-            
+
             res.on('data', (chunk) => {
                 data += chunk;
             });
-            
+
             res.on('end', () => {
                 try {
                     const parsedData = JSON.parse(data);
@@ -48,11 +50,11 @@ function makeRequest(url) {
                 }
             });
         });
-        
+
         req.on('error', (error) => {
             reject(error);
         });
-        
+
         req.setTimeout(10000, () => {
             req.destroy();
             reject(new Error('Timeout na requisição'));
@@ -69,6 +71,14 @@ function normalizarNome(nome) {
         .trim();
 }
 
+// Função para normalizar a plataforma (PS4/PS5)
+function normalizePlatform(plataforma) {
+    if (!plataforma) return plataforma;
+    if (["PS5", "PlayStation 5"].includes(plataforma)) return "PS5";
+    if (["PS4", "PlayStation 4"].includes(plataforma)) return "PS4";
+    return plataforma;
+}
+
 // Função para buscar imagem na RAWG, tentando variações do nome
 async function buscarImagemRAWG(nomeJogo) {
     const tentativas = [
@@ -78,51 +88,51 @@ async function buscarImagemRAWG(nomeJogo) {
         nomeJogo.split(' ')[0], // Primeira palavra apenas
         nomeJogo.split(':')[0].trim(), // Parte antes dos dois pontos (para jogos com subtítulos)
     ];
-    
+
     console.log(`🎮 Buscando imagem para: "${nomeJogo}"`);
-    
+
     for (let i = 0; i < tentativas.length; i++) {
         const nomeTentativa = tentativas[i];
         if (!nomeTentativa || nomeTentativa.length < 2) continue;
-        
+
         try {
             const url = `${RAWG_BASE_URL}/games?key=${RAWG_API_KEY}&search=${encodeURIComponent(nomeTentativa)}&page_size=3`;
             console.log(`   Tentativa ${i + 1}: "${nomeTentativa}"`);
-            
+
             const data = await makeRequest(url);
-            
+
             if (data.results && data.results.length > 0) {
                 // Procura por uma correspondência exata ou similar
                 for (const game of data.results) {
                     if (game.background_image) {
                         const nomeEncontrado = game.name.toLowerCase();
                         const nomeBuscado = nomeJogo.toLowerCase();
-                        
+
                         // Verifica se há correspondência (exata ou parcial)
-                        if (nomeEncontrado.includes(nomeBuscado.split(' ')[0]) || 
+                        if (nomeEncontrado.includes(nomeBuscado.split(' ')[0]) ||
                             nomeBuscado.includes(nomeEncontrado.split(' ')[0])) {
                             console.log(`   ✅ Imagem encontrada: ${game.name}`);
                             return game.background_image;
                         }
                     }
                 }
-                
+
                 // Se não encontrou correspondência exata, usa o primeiro resultado
                 if (data.results[0].background_image) {
                     console.log(`   ⚠️  Usando primeiro resultado: ${data.results[0].name}`);
                     return data.results[0].background_image;
                 }
             }
-            
+
             // Pequena pausa entre requisições para evitar rate limiting
             await new Promise(resolve => setTimeout(resolve, 100));
-            
+
         } catch (error) {
             console.log(`   ❌ Erro na tentativa ${i + 1}: ${error.message}`);
             continue;
         }
     }
-    
+
     console.log(`   ❌ Nenhuma imagem encontrada para "${nomeJogo}"`);
     return null;
 }
@@ -130,31 +140,31 @@ async function buscarImagemRAWG(nomeJogo) {
 // Rota para testar a API RAWG
 app.get('/api/test-rawg/:gameName', async (req, res) => {
     const { gameName } = req.params;
-    
+
     try {
         console.log(`\n🔍 Testando busca por: "${gameName}"`);
         const imagem = await buscarImagemRAWG(gameName);
-        
+
         if (imagem) {
-            res.json({ 
-                success: true, 
+            res.json({
+                success: true,
                 game: gameName,
                 image: imagem,
-                message: 'Imagem encontrada com sucesso!' 
+                message: 'Imagem encontrada com sucesso!'
             });
         } else {
-            res.json({ 
-                success: false, 
+            res.json({
+                success: false,
                 game: gameName,
                 image: null,
-                message: 'Nenhuma imagem encontrada' 
+                message: 'Nenhuma imagem encontrada'
             });
         }
     } catch (error) {
         console.error('Erro no teste da RAWG:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: error.message 
+        res.status(500).json({
+            success: false,
+            error: error.message
         });
     }
 });
@@ -163,7 +173,7 @@ app.get('/api/test-rawg/:gameName', async (req, res) => {
 app.get('/api/jogos', async (req, res) => {
     try {
         console.log('\n📊 Buscando jogos no banco de dados...');
-        
+
         // Realiza um LEFT JOIN entre as tabelas 'jogos' e 'configuracoes_usuario_jogo'
         const query = `
             SELECT
@@ -182,6 +192,8 @@ app.get('/api/jogos', async (req, res) => {
                 j.nota_total,
                 j.platinado,
                 j.tipo_jogo,
+                j.metacritic,
+                j.tags,
                 cuj.colocacao,
                 cuj.idioma,
                 cuj.plataforma,
@@ -203,17 +215,17 @@ app.get('/api/jogos', async (req, res) => {
                 cuj.colocacao ASC NULLS LAST, j.id
 
         `;
-        
+
         const result = await pool.query(query);
         const jogos = result.rows;
         console.log(`📋 Encontrados ${jogos.length} jogos no banco`);
         res.json(jogos);
-        
+
     } catch (err) {
         console.error('❌ Erro ao buscar jogos:', err);
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'Erro interno do servidor ao buscar jogos.',
-            details: err.message 
+            details: err.message
         });
     }
 });
@@ -226,7 +238,8 @@ app.get('/api/jogos/:id', async (req, res) => {
             SELECT
                 j.id, j.nome, j.foto_url, j.desenvolvedora, j.publicadora, j.ano_lancamento, j.genero,
                 j.tempo_jogado_horas, j.tempo_jogado_minutos, j.nota_gameplay, j.nota_historia,
-                j.nota_trilha_sonora, j.nota_total, j.platinado, j.tipo_jogo,
+                j.tempo_jogado_horas, j.tempo_jogado_minutos, j.nota_gameplay, j.nota_historia,
+                j.nota_trilha_sonora, j.nota_total, j.platinado, j.tipo_jogo, j.metacritic, j.tags,
                 cuj.colocacao, cuj.idioma, cuj.plataforma, cuj.status_online, cuj.trofeus_totais,
                 cuj.trofeus_obtidos, cuj.trofeus_restantes, cuj.trofeu_mais_dificil_percentual,
                 cuj.completude_jogo, cuj.dificuldade_platina, cuj.data_primeiro_trofeu,
@@ -265,8 +278,11 @@ app.post('/api/jogos', async (req, res) => {
             nota_trilha_sonora, nota_total, platinado, tipo_jogo, colocacao, idioma,
             plataforma, status_online, trofeus_totais, trofeus_obtidos, trofeus_restantes,
             trofeu_mais_dificil_percentual, completude_jogo, dificuldade_platina,
-            data_primeiro_trofeu, data_ultimo_trofeu, dias_para_platina
+            data_primeiro_trofeu, data_ultimo_trofeu, dias_para_platina, metacritic, tags
         } = req.body;
+
+        // Normaliza a plataforma
+        const plataformaNormalizada = normalizePlatform(plataforma);
 
         // 3. Primeiro INSERT: na tabela principal 'jogos'
         //    Usamos 'RETURNING id' para obter o ID do jogo recém-criado.
@@ -274,14 +290,14 @@ app.post('/api/jogos', async (req, res) => {
             INSERT INTO jogos (
                 nome, foto_url, desenvolvedora, publicadora, ano_lancamento, genero, 
                 tempo_jogado_horas, tempo_jogado_minutos, nota_gameplay, nota_historia,
-                nota_trilha_sonora, nota_total, platinado, tipo_jogo
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                nota_trilha_sonora, nota_total, platinado, tipo_jogo, metacritic, tags
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             RETURNING id;
         `;
         const jogoValues = [
             nome, foto_url, desenvolvedora, publicadora, ano_lancamento, genero,
             tempo_jogado_horas, tempo_jogado_minutos, nota_gameplay, nota_historia,
-            nota_trilha_sonora, nota_total, platinado, tipo_jogo
+            nota_trilha_sonora, nota_total, platinado, tipo_jogo, metacritic, tags
         ];
 
         const novoJogoResult = await client.query(jogoQuery, jogoValues);
@@ -302,7 +318,7 @@ app.post('/api/jogos', async (req, res) => {
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14);
         `;
         const configValues = [
-            novoJogoId, colocacao, idioma, plataforma, status_online, trofeus_totais,
+            novoJogoId, colocacao, idioma, plataformaNormalizada, status_online, trofeus_totais,
             trofeus_obtidos, trofeus_restantes, trofeu_mais_dificil_percentual,
             completude_jogo, dificuldade_platina, data_primeiro_trofeu || null, // Garante que datas vazias virem NULL
             data_ultimo_trofeu || null, dias_para_platina
@@ -345,21 +361,24 @@ app.put('/api/jogos/:id', async (req, res) => {
             nota_trilha_sonora, nota_total, platinado, tipo_jogo, colocacao, idioma,
             plataforma, status_online, trofeus_totais, trofeus_obtidos, trofeus_restantes,
             trofeu_mais_dificil_percentual, completude_jogo, dificuldade_platina,
-            data_primeiro_trofeu, data_ultimo_trofeu, dias_para_platina
+            data_primeiro_trofeu, data_ultimo_trofeu, dias_para_platina, metacritic, tags
         } = req.body;
+
+        // Normaliza a plataforma
+        const plataformaNormalizada = normalizePlatform(plataforma);
 
         // 1. UPDATE na tabela 'jogos'
         const jogoQuery = `
             UPDATE jogos SET
                 nome = $1, foto_url = $2, desenvolvedora = $3, publicadora = $4, ano_lancamento = $5,
                 genero = $6, tempo_jogado_horas = $7, tempo_jogado_minutos = $8, nota_gameplay = $9,
-                nota_historia = $10, nota_trilha_sonora = $11, nota_total = $12, platinado = $13, tipo_jogo = $14
-            WHERE id = $15;
+                nota_historia = $10, nota_trilha_sonora = $11, nota_total = $12, platinado = $13, tipo_jogo = $14, metacritic = $15, tags = $16
+            WHERE id = $17;
         `;
         const jogoValues = [
             nome, foto_url, desenvolvedora, publicadora, ano_lancamento, genero,
             tempo_jogado_horas, tempo_jogado_minutos, nota_gameplay, nota_historia,
-            nota_trilha_sonora, nota_total, platinado, tipo_jogo, id
+            nota_trilha_sonora, nota_total, platinado, tipo_jogo, metacritic, tags, id
         ];
         await client.query(jogoQuery, jogoValues);
 
@@ -373,7 +392,7 @@ app.put('/api/jogos/:id', async (req, res) => {
             WHERE jogo_id = $14;
         `;
         const configValues = [
-            colocacao, idioma, plataforma, status_online, trofeus_totais,
+            colocacao, idioma, plataformaNormalizada, status_online, trofeus_totais,
             trofeus_obtidos, trofeus_restantes, trofeu_mais_dificil_percentual,
             completude_jogo, dificuldade_platina, data_primeiro_trofeu || null,
             data_ultimo_trofeu || null, dias_para_platina, id
@@ -393,10 +412,96 @@ app.put('/api/jogos/:id', async (req, res) => {
     }
 });
 
+// Rota para buscar jogos por ano de término (GOTY)
+app.get('/api/jogos/ano/:ano', async (req, res) => {
+    const { ano } = req.params;
+    try {
+        console.log(`\n🏆 Buscando jogos finalizados em: ${ano}`);
+
+        const query = `
+            SELECT
+                j.id,
+                j.nome,
+                j.foto_url,
+                j.desenvolvedora,
+                j.publicadora,
+                j.ano_lancamento,
+                j.genero,
+                j.nota_total,
+                j.platinado,
+                j.metacritic,
+                j.tags,
+                j.platinado,
+                cuj.colocacao,
+                cuj.plataforma,
+                cuj.data_ultimo_trofeu
+            FROM
+                jogos AS j
+            JOIN
+                configuracoes_usuario_jogo AS cuj ON j.id = cuj.jogo_id
+            WHERE
+                EXTRACT(YEAR FROM cuj.data_ultimo_trofeu) = $1
+            ORDER BY
+                cuj.colocacao ASC NULLS LAST, cuj.data_ultimo_trofeu DESC
+        `;
+
+        const result = await pool.query(query, [ano]);
+        const jogos = result.rows;
+        console.log(`📋 Encontrados ${jogos.length} jogos para o ano ${ano}`);
+        res.json(jogos);
+
+    } catch (err) {
+        console.error('❌ Erro ao buscar jogos por ano:', err);
+        res.status(500).json({
+            error: 'Erro interno ao buscar jogos por ano.',
+            details: err.message
+        });
+    }
+});
+
+// Rota para atualizar o ranking (colocação) de múltiplos jogos
+app.put('/api/jogos/ranking', async (req, res) => {
+    const { rankings } = req.body; // Espera um array de { id: jogoId, colocacao: 1 }
+
+    if (!Array.isArray(rankings)) {
+        return res.status(400).json({ error: 'Formato inválido. Esperado um array de rankings.' });
+    }
+
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        for (const item of rankings) {
+            const { id, colocacao } = item;
+
+            // Atualiza apenas a colocação na tabela de configurações
+            await client.query(
+                'UPDATE configuracoes_usuario_jogo SET colocacao = $1 WHERE jogo_id = $2',
+                [colocacao, id]
+            );
+        }
+
+        await client.query('COMMIT');
+        console.log(`✅ Ranking atualizado para ${rankings.length} jogos.`);
+        res.json({ message: 'Ranking atualizado com sucesso!' });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('❌ Erro ao atualizar ranking:', err);
+        res.status(500).json({
+            error: 'Erro interno ao atualizar ranking.',
+            details: err.message
+        });
+    } finally {
+        client.release();
+    }
+});
+
 // Inicia o servidor
 app.listen(port, () => {
     console.log(`🚀 Servidor rodando em http://localhost:${port}`);
-    
+
     // Testa a conexão com o banco de dados ao iniciar
     pool.query('SELECT NOW()')
         .then(() => console.log('✅ Conexão com o PostgreSQL estabelecida com sucesso!'))
